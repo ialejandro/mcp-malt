@@ -30,7 +30,17 @@ There is no OAuth 2.0 here. Malt publishes no authorization server and no token 
 
 ## Install
 
-Published to npm and to GHCR as a container image. `npx` is the usual choice for an MCP client; Docker suits a locked-down or shared setup.
+Published three ways from one release: the npm package on [npmjs](https://www.npmjs.com/package/@ialejandro/mcp-malt) and on GitHub Packages, and the container image on GHCR. `npx` is the usual choice for an MCP client; Docker suits a locked-down or shared setup.
+
+Pin a version in the examples below. An MCP server runs with your API token, so an unpinned `@latest` means a new release starts running on your machine without you choosing it.
+
+```bash
+npm install @ialejandro/mcp-malt@1.0.0
+```
+
+To move to a newer version, bump the number in your client config and restart the client. The [releases page](https://github.com/ialejandro/mcp-malt/releases) lists what changed in each one.
+
+To install from GitHub Packages instead of npmjs, point the scope at it: `@ialejandro:registry=https://npm.pkg.github.com` in your `.npmrc`.
 
 ### npx
 
@@ -41,7 +51,7 @@ Published to npm and to GHCR as a container image. `npx` is the usual choice for
   "mcpServers": {
     "malt": {
       "command": "npx",
-      "args": ["-y", "mcp-malt"],
+      "args": ["-y", "@ialejandro/mcp-malt@1.0.0"],
       "env": {
         "MALT_API_TOKEN": "your-token-here",
         "MALT_TOOLSETS": "invoices,payments,fee-invoices"
@@ -57,7 +67,7 @@ Published to npm and to GHCR as a container image. `npx` is the usual choice for
 claude mcp add malt \
   --env MALT_API_TOKEN=your-token-here \
   --env MALT_TOOLSETS=invoices,payments,fee-invoices \
-  -- npx -y mcp-malt
+  -- npx -y @ialejandro/mcp-malt@1.0.0
 ```
 
 ### Docker
@@ -68,7 +78,7 @@ The server speaks JSON-RPC over stdin and stdout, so `-i` is required and `-t` m
 docker run -i --rm \
   -e MALT_API_TOKEN=your-token-here \
   -e MALT_TOOLSETS=invoices \
-  ghcr.io/ialejandro/mcp-malt
+  ghcr.io/ialejandro/mcp-malt:1.0.0
 ```
 
 ```jsonc
@@ -82,7 +92,7 @@ docker run -i --rm \
         "run", "-i", "--rm",
         "-e", "MALT_API_TOKEN",
         "-e", "MALT_TOOLSETS",
-        "ghcr.io/ialejandro/mcp-malt"
+        "ghcr.io/ialejandro/mcp-malt:1.0.0"
       ],
       "env": {
         "MALT_API_TOKEN": "your-token-here",
@@ -125,7 +135,7 @@ npm ci && npm run build
         "run", "-i", "--rm",
         "-e", "MALT_API_TOKEN",
         "-e", "MALT_TOOLSETS",
-        "ghcr.io/ialejandro/mcp-malt"
+        "ghcr.io/ialejandro/mcp-malt:1.0.0"
       ],
       "env": {
         "MALT_API_TOKEN": "your-token-here",

@@ -16,8 +16,10 @@ Money your clients owe you. Toolset: `invoices`.
 
 | Parameter | Required | Notes |
 | --- | --- | --- |
-| `since` | yes | ISO 8601. Start of the range, inclusive |
-| `until` | no | ISO 8601. Defaults to now |
+| `since` | yes | Start of the range, inclusive |
+| `until` | no | End of the range, inclusive. Defaults to now |
+
+Malt declares both as `date-time` and enforces it, so a bare `2026-02-01` sent straight to the API comes back as a 400. The tools accept either form: a date-only value is widened for you, `since` to the start of that day and `until` to the end of it, so `since=2026-02-01, until=2026-02-28` covers the whole of February.
 
 This endpoint does not paginate and returns a bare array, so a multi-year range can return thousands of records. Results are capped at `MALT_MAX_LIST_ITEMS` (200 by default) and the tool tells you when it truncated.
 

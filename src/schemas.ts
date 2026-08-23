@@ -4,82 +4,114 @@
  * Input schemas are strict: catching a bad argument before it costs an HTTP
  * round trip is the whole point of having them.
  *
- * Output schemas are deliberately permissive, both to unknown fields and to
- * missing ones. The SDK validates structuredContent against them and turns a
- * mismatch into a tool error, so a strict schema here would mean that the day
- * Malt omits a field its own spec marks required, every call fails even though
- * the data is fine. At spec version 0.0.1 that is a real risk and we gain
- * nothing by policing a payload we did not produce. The schemas stay for their
- * documentation value: they tell the model what shape to expect.
+ * Output schemas are deliberately permissive: unknown fields pass, and every
+ * field is optional and nullable. The SDK validates structuredContent against
+ * them and turns a mismatch into a tool error, so anything stricter means a
+ * perfectly good API response becomes a failed tool call.
+ *
+ * Nullable is not belt and braces. Malt really does send `null` for absent
+ * optional fields rather than omitting them: externalId, customer.country,
+ * supplier.registrationNumber and supplier.vatNumber all come back null on live
+ * invoices, and `.optional()` alone rejects null. That combination broke every
+ * malt_find_invoices call against the real API while the mocked tests passed.
+ *
+ * The schemas stay for their documentation value: they tell the model what
+ * shape to expect. They are not there to police a payload we did not produce.
  */
 
 import { z } from 'zod';
 
-/** ISO 8601 date-time, which is what the `since` and `until` parameters want. */
+/** A response field: present, absent or explicitly null are all acceptable. */
+const maybe = <T extends z.ZodType>(schema: T) => schema.nullish();
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Malt's date parameters are declared `format: date-time` and it means it: a
+ * plain `2026-02-01` is answered with a 400. People and models both reach for
+ * plain dates, so rather than rejecting them we widen them to the day they
+ * obviously mean.
+ *
+ * `since` opens at the start of its day and `until` closes at the end of its,
+ * so `since=2026-02-01, until=2026-02-28` covers February rather than stopping
+ * at midnight on the 28th and quietly losing a day of invoices.
+ */
+function toDateTime(value: string, edge: 'start' | 'end'): string {
+    if (!DATE_ONLY.test(value)) return value;
+    return `${value}T${edge === 'end' ? '23:59:59.999' : '00:00:00.000'}Z`;
+}
+
 export const isoDateTime = z
     .string()
     .refine(v => !Number.isNaN(Date.parse(v)), 'must be an ISO 8601 date or date-time, e.g. 2026-01-01T00:00:00Z');
 
 export const dateRange = z.object({
-    since: isoDateTime.describe('Start of the search range, inclusive. ISO 8601, e.g. 2026-01-01T00:00:00Z.'),
-    until: isoDateTime.optional().describe('End of the search range. ISO 8601. Defaults to now if omitted.')
+    since: isoDateTime
+        .transform(v => toDateTime(v, 'start'))
+        .describe('Start of the range, inclusive. A date like 2026-02-01 or a full 2026-02-01T00:00:00Z.'),
+    until: isoDateTime
+        .transform(v => toDateTime(v, 'end'))
+        .optional()
+        .describe('End of the range, inclusive. A date like 2026-02-28 or a full date-time. Defaults to now.')
 });
 
 const party = z
     .object({
-        name: z.string(),
-        street: z.string().optional(),
-        city: z.string().optional(),
-        zip: z.string().optional(),
-        country: z.string().optional(),
-        countryCode: z.string().optional(),
-        registrationNumber: z.string().optional(),
-        vatNumber: z.string().optional()
+        name: maybe(z.string()),
+        street: maybe(z.string()),
+        city: maybe(z.string()),
+        zip: maybe(z.string()),
+        country: maybe(z.string()),
+        countryCode: maybe(z.string()),
+        registrationNumber: maybe(z.string()),
+        vatNumber: maybe(z.string())
     })
-    .partial()
     .loose();
 
-const tax = z.object({ name: z.string(), amount: z.number(), rate: z.number() }).partial().loose();
+const tax = z
+    .object({ name: maybe(z.string()), amount: maybe(z.number()), rate: maybe(z.number()) })
+    .loose();
+
+const lightInvoice = z
+    .object({ id: maybe(z.string()), externalId: maybe(z.string()), type: maybe(z.string()) })
+    .loose();
 
 export const invoiceResource = z
     .object({
-        id: z.string(),
-        title: z.string(),
-        creationDate: z.string(),
-        expectedPaymentDate: z.string(),
-        externalId: z.string().optional(),
-        amountAllTaxesIncluded: z.number(),
-        amountWithoutTaxes: z.number(),
-        taxes: z.array(tax),
-        customer: party,
-        supplier: party
+        id: maybe(z.string()),
+        title: maybe(z.string()),
+        creationDate: maybe(z.string()),
+        expectedPaymentDate: maybe(z.string()),
+        externalId: maybe(z.string()),
+        amountAllTaxesIncluded: maybe(z.number()),
+        amountWithoutTaxes: maybe(z.number()),
+        taxes: maybe(z.array(tax)),
+        customer: maybe(party),
+        supplier: maybe(party)
     })
-    .partial()
     .loose();
 
 export const feeInvoiceResource = z
     .object({
-        id: z.string(),
-        title: z.string(),
-        amountAllTaxesIncluded: z.number(),
-        amountWithoutTaxes: z.number(),
-        taxes: z.array(tax),
-        customer: party,
-        supplier: party
+        id: maybe(z.string()),
+        title: maybe(z.string()),
+        amountAllTaxesIncluded: maybe(z.number()),
+        amountWithoutTaxes: maybe(z.number()),
+        taxes: maybe(z.array(tax)),
+        customer: maybe(party),
+        supplier: maybe(party)
     })
-    .partial()
     .loose();
 
 export const paymentResource = z
     .object({
-        id: z.string(),
-        date: z.string(),
-        amount: z.number(),
-        currency: z.string(),
-        wireRef: z.string().optional(),
-        invoices: z.array(z.object({ id: z.string(), externalId: z.string().optional(), type: z.string() }).partial().loose())
+        id: maybe(z.string()),
+        date: maybe(z.string()),
+        amount: maybe(z.number()),
+        currency: maybe(z.string()),
+        wireRef: maybe(z.string()),
+        invoices: maybe(z.array(lightInvoice))
     })
-    .partial()
     .loose();
 
 /**
@@ -132,14 +164,14 @@ export const submittedUser = z.object({
         .describe('Up to 3 phone numbers, formatted per RFC 3966.')
 });
 
-export const userResource = z.object({ id: z.string() }).partial().loose();
+export const userResource = z.object({ id: maybe(z.string()) }).loose();
 
 export const userPage = z
     .object({
-        totalResults: z.number().int().optional(),
-        startIndex: z.number().int().optional(),
-        itemsPerPage: z.number().int().optional(),
-        Resources: z.array(z.looseObject({})).optional()
+        totalResults: maybe(z.number().int()),
+        startIndex: maybe(z.number().int()),
+        itemsPerPage: maybe(z.number().int()),
+        Resources: maybe(z.array(z.looseObject({})))
     })
     .loose();
 

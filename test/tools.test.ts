@@ -40,6 +40,66 @@ describe('invoices', () => {
         expect(res.content[0].text).toMatch(/Narrow the date range/);
     });
 
+    // Malt sends null for absent optional fields rather than omitting them.
+    // Schemas that were optional but not nullable failed every live call while
+    // every mocked test passed, because the fixtures omitted the fields instead.
+    it('accepts null in the optional fields Malt actually nulls', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockImplementation(
+                json([
+                    {
+                        id: 'ESRE0063GQ260001',
+                        title: 'DevOps para proyecto de migración',
+                        creationDate: '2026-02-02T08:17:59.694Z',
+                        expectedPaymentDate: '2026-04-03T00:00:00Z',
+                        externalId: null,
+                        amountAllTaxesIncluded: 2544.0,
+                        amountWithoutTaxes: 2400.0,
+                        taxes: [{ name: 'IRPF', amount: -360.0, rate: -15.0 }],
+                        customer: { name: 'Malt Community SL', city: 'Madrid', country: null },
+                        supplier: { name: 'Someone', registrationNumber: null, vatNumber: null }
+                    }
+                ])
+            )
+        );
+
+        const res = await callTool('malt_find_invoices', { since: '2026-01-01T00:00:00Z' });
+
+        expect(res.isError).toBeUndefined();
+        expect(res.structuredContent.count).toBe(1);
+    });
+
+    // Malt declares these parameters as date-time and enforces it: a plain
+    // 2026-02-01 comes back as a 400. Date-only input is widened rather than
+    // refused, because it is what people and models naturally pass.
+    it('widens a date-only since to the start of that day', async () => {
+        const fetchMock = vi.fn().mockImplementation(json([]));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await callTool('malt_find_invoices', { since: '2026-02-01' });
+
+        expect(String(fetchMock.mock.calls[0]![0])).toContain('since=2026-02-01T00%3A00%3A00.000Z');
+    });
+
+    it('widens a date-only until to the end of that day, so the last day is included', async () => {
+        const fetchMock = vi.fn().mockImplementation(json([]));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await callTool('malt_find_invoices', { since: '2026-02-01', until: '2026-02-28' });
+
+        expect(String(fetchMock.mock.calls[0]![0])).toContain('until=2026-02-28T23%3A59%3A59.999Z');
+    });
+
+    it('passes a full date-time through untouched', async () => {
+        const fetchMock = vi.fn().mockImplementation(json([]));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await callTool('malt_find_invoices', { since: '2026-02-01T09:30:00Z' });
+
+        expect(String(fetchMock.mock.calls[0]![0])).toContain('since=2026-02-01T09%3A30%3A00Z');
+    });
+
     it('rejects a since value that is not a date before calling the API', async () => {
         const fetchMock = vi.fn();
         vi.stubGlobal('fetch', fetchMock);

@@ -1,21 +1,5 @@
 name: Create release
 
-# Analyses the conventional commits since the last release, then publishes the
-# package to npm, creates the tag and publishes the GitHub release.
-#
-# @semantic-release/npm sets the version in package.json before packing, so the
-# published package carries the right version. That bump is not committed back,
-# so package.json on main stays at its starting value and a release changes
-# nothing in the repository. src/index.ts reads the version from the manifest at
-# runtime, which is why the published server reports the released version.
-#
-# The tag is what triggers docker-build.yml. That only works because the tag is
-# pushed with a PAT: a tag created with the default GITHUB_TOKEN does not start
-# another workflow, which is a deliberate GitHub loop guard.
-#
-# A push with no releasable commits produces no release. feat, fix, perf and
-# breaking changes cut one; chore, docs, test, refactor and style do not.
-
 permissions: {}
 
 on:
@@ -38,16 +22,39 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-      # Required for npm provenance.
+      packages: write
       id-token: write
 
     steps:
+      - name: Check the required secrets exist
+        env:
+          PAT_GITHUB: ${{ secrets.PAT_GITHUB }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          missing=0
+          if [ -z "$PAT_GITHUB" ]; then
+            echo "PAT_GITHUB is empty. Add it under Settings > Secrets and variables > Actions"
+            echo "as a repository secret (an Environment or Dependabot secret is not visible here)."
+            echo "It needs a classic PAT with repo and write:packages scopes."
+            missing=1
+          fi
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "NPM_TOKEN is empty. Create an npm token that can publish to"
+            echo "https://registry.npmjs.org and add it as a repository secret."
+            echo "Use a classic Automation token, which bypasses 2FA and is what CI needs,"
+            echo "or a Granular Access token with read and write on @ialejandro/mcp-malt."
+            echo "https://docs.npmjs.com/getting-started/working_with_tokens"
+            missing=1
+          fi
+          [ "$missing" -eq 0 ] || exit 1
+          echo "Both secrets are present."
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # semantic-release reads the full history to find the last release.
           fetch-depth: 0
-          persist-credentials: false
+          token: ${{ secrets.PAT_GITHUB }}
+          persist-credentials: true
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -59,8 +66,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # The published package ships dist/, so a broken build must stop the
-      # release rather than publish an empty or stale tarball.
       - name: Verify before publishing
         run: |
           npm run typecheck
@@ -80,12 +85,24 @@ jobs:
           tag_format: v${version}
           dry_run: ${{ inputs.dry_run || false }}
         env:
-          # A PAT, not GITHUB_TOKEN, so the tag this creates triggers
-          # docker-build.yml. With GITHUB_TOKEN the tag lands and nothing runs.
-          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT_GITHUB }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
+
+      - name: Publish to GitHub Packages
+        if: steps.semantic_release.outputs.new_release_published == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PAT_GITHUB }}
+        run: |
+          version="${{ steps.semantic_release.outputs.new_release_version }}"
+          npm pkg set version="$version"
+          npm pkg delete publishConfig.registry
+          {
+            echo "@ialejandro:registry=https://npm.pkg.github.com"
+            echo "//npm.pkg.github.com/:_authToken=\${NODE_AUTH_TOKEN}"
+          } >> .npmrc
+          npm publish --registry=https://npm.pkg.github.com --provenance=false
 
       - name: Summarise
         run: |
@@ -94,7 +111,8 @@ jobs:
               version="${{ steps.semantic_release.outputs.new_release_version }}"
               echo "## Released v${version}"
               echo
-              echo "- npm: \`npx -y mcp-malt@${version}\`"
+              echo "- npmjs: \`npx -y @ialejandro/mcp-malt@${version}\`"
+              echo "- GitHub Packages: \`@ialejandro/mcp-malt@${version}\`"
               echo "- image: building now from tag \`v${version}\`"
             else
               echo "## No release"

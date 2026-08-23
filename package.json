@@ -1,5 +1,5 @@
 {
-  "name": "mcp-malt",
+  "name": "@ialejandro/mcp-malt",
   "version": "0.1.0",
   "description": "MCP server for the Malt API: invoices, payments, service charges and SCIM user provisioning.",
   "repository": {
@@ -22,6 +22,10 @@
   ],
   "engines": {
     "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

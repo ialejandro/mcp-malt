@@ -27,8 +27,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The git tag is the only source of the version. package.json is not kept
-      # in step with it, because nothing is published to npm.
       - name: Read version from the tag
         id: version
         run: |

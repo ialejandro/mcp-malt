@@ -1,8 +1,7 @@
-name: CI
+name: Test and Linter
 
 on:
   pull_request:
-  push:
     branches:
       - main
 
@@ -22,14 +21,11 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      # The typecheck and test hooks shell out to npm.
       - run: npm ci
       - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
         with:
           extra_args: --all-files --hook-stage pre-commit
         env:
-          # A local guard against committing straight to main. In CI the ref is
-          # whatever is being tested, so the hook would fail every run on main.
           SKIP: no-commit-to-branch
 
   test:

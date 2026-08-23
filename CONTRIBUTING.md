@@ -166,7 +166,17 @@ creates the tag and publishes a GitHub release with generated notes.
 So the commit type you choose decides the version. A bug fix labelled `chore:` never ships.
 
 The tag then triggers `docker-build.yml`, which builds and pushes the image to GHCR. So one
-merge produces an npm package and a container image from the same commit.
+merge produces three artefacts from the same commit:
+
+| Artefact | Where |
+| --- | --- |
+| npm package | [npmjs](https://www.npmjs.com/package/@ialejandro/mcp-malt) |
+| npm package | GitHub Packages, `npm.pkg.github.com` |
+| container image | GHCR, `ghcr.io/ialejandro/mcp-malt` |
+
+The package is scoped `@ialejandro/mcp-malt` because GitHub Packages accepts scoped names
+only. semantic-release publishes to npmjs, then a following step republishes the same version
+to GitHub Packages, which needs its own auth and registry.
 
 ### Where the version lives
 

@@ -7,7 +7,9 @@
  * tools/list and the model never sees it.
  */
 
+import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
@@ -19,11 +21,14 @@ import { registerPrompts } from './prompts.js';
 import { describeToolsets, TOOLSETS } from './tools/registry.js';
 import type { ToolContext } from './tools/shared.js';
 
-// Read from the manifest rather than hardcoded, because semantic-release bumps
-// the version in the published package without committing it back to main. A
-// literal here would report a stale version to every client forever.
-const manifest = createRequire(import.meta.url)('../package.json') as { name: string; version: string };
-const SERVER_INFO = { name: manifest.name, version: manifest.version } as const;
+// The version is read from the manifest rather than hardcoded, because
+// semantic-release bumps it in the published package without committing it back
+// to main. A literal here would report a stale version to every client forever.
+//
+// The name stays fixed: it is how clients identify this server, and it should
+// not change just because the npm package carries a scope.
+const { version } = createRequire(import.meta.url)('../package.json') as { version: string };
+const SERVER_INFO = { name: 'mcp-malt', version } as const;
 
 export function buildServer(config: Config, log: Logger): McpServer {
     const server = new McpServer(SERVER_INFO);
@@ -76,8 +81,25 @@ async function main(): Promise<void> {
     });
 }
 
+/**
+ * True when this file is the program being run, rather than being imported.
+ *
+ * Both sides are resolved through realpath because npm installs the bin as a
+ * symlink: under `npx`, argv[1] is `.bin/mcp-malt` while import.meta.url is the
+ * real dist/index.js. Comparing the two raw strings silently fails to match, and
+ * the server then exits 0 having done nothing at all.
+ */
+export function isMainModule(argv1: string | undefined, moduleUrl: string): boolean {
+    if (!argv1) return false;
+    try {
+        return realpathSync(argv1) === realpathSync(fileURLToPath(moduleUrl));
+    } catch {
+        return false;
+    }
+}
+
 // Only run when executed directly, so tests can import buildServer.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(process.argv[1], import.meta.url)) {
     main().catch(err => {
         console.error(`[mcp-malt] fatal: ${err instanceof Error ? err.stack : String(err)}`);
         process.exit(1);
