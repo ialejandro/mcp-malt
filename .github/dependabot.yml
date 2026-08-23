@@ -1,0 +1,55 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 10
+    assignees:
+      - ialejandro
+    labels:
+      - enhancement
+      - dependency-management
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: chore
+      include: scope
+    rebase-strategy: auto
+    pull-request-branch-name:
+      separator: "-"
+
+  - package-ecosystem: github-actions
+    directory: /
+    open-pull-requests-limit: 5
+    assignees:
+      - ialejandro
+    schedule:
+      interval: monthly
+    labels:
+      - enhancement
+      - dependency-management
+    commit-message:
+      prefix: chore
+      include: scope
+    rebase-strategy: auto
+    pull-request-branch-name:
+      separator: "-"
+
+  - package-ecosystem: docker
+    directory: /
+    open-pull-requests-limit: 5
+    assignees:
+      - ialejandro
+    schedule:
+      interval: monthly
+    labels:
+      - enhancement
+      - dependency-management
+    commit-message:
+      prefix: chore
+      include: scope
+    rebase-strategy: auto
+    pull-request-branch-name:
+      separator: "-"

@@ -1,0 +1,118 @@
+name: Build and Push Docker Image
+
+permissions: {}
+
+env:
+  GHCR_REGISTRY: ghcr.io
+  GHCR_REPO: ${{ github.repository }}
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build and push image
+    runs-on: ubuntu-latest
+
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Read version from package.json
+        id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      # A tag push must match the version in package.json, or the image and the
+      # npm package go out under the same name with different contents.
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          tag_version="${GITHUB_REF_NAME#v}"
+          package_version="${{ steps.version.outputs.version }}"
+          if [ "$tag_version" != "$package_version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $package_version."
+            exit 1
+          fi
+          echo "Tag and package.json agree on $package_version."
+
+      - name: Set Docker metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}
+          labels: |
+            org.opencontainers.image.maintainer=ialejandro
+            org.opencontainers.image.title=mcp-malt
+            org.opencontainers.image.description=MCP server for the Malt API: invoices, payments, service charges and SCIM user provisioning
+            org.opencontainers.image.vendor=ialejandro
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            # A manual run is not on a tag, so the semver patterns produce
+            # nothing. Without this the build would have no tag to push.
+            type=sha,prefix=manual-,enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: "[GHCR] Log in to the Container registry"
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          sbom: true
+          tags: ${{ steps.meta.outputs.tags }}
+
+      - name: "[GHCR] Generate artifact attestation"
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Summarise what was published
+        run: |
+          {
+            echo "## Image published"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo
+            echo "Digest: \`${{ steps.push.outputs.digest }}\`"
+            echo
+            echo "Pull and run:"
+            echo
+            echo '```bash'
+            echo "docker run -i --rm \\"
+            echo "  -e MALT_API_TOKEN=your-token-here \\"
+            echo "  -e MALT_TOOLSETS=invoices \\"
+            echo "  ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}:${{ steps.version.outputs.version }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

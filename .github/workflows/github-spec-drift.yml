@@ -1,0 +1,48 @@
+name: Malt API spec drift
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+
+      - id: drift
+        continue-on-error: true
+        run: node scripts/check-spec-drift.mjs
+
+      - name: Open a PR with the new spec
+        if: steps.drift.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          branch: chore/malt-spec-drift
+          title: 'Malt API spec changed'
+          commit-message: 'chore: sync Malt OpenAPI snapshot'
+          body: |
+            The live Malt OpenAPI document no longer matches `spec/malt-openapi.json`.
+
+            ${{ steps.drift.outputs.summary }}
+
+            Before merging, check the tools still match:
+
+            - A new operation needs a tool in the matching toolset, or a line in the README saying why not.
+            - A removed operation means a tool that will fail at runtime.
+            - Changed parameters mean the zod input schema in `src/tools/` is out of date.
+            - Changed responses mean the output schema in `src/schemas.ts` is out of date.
+
+      - name: Fail if the check itself broke
+        if: steps.drift.outcome == 'failure' && steps.drift.outputs.changed == ''
+        run: |
+          echo "The drift check could not run. The spec URL or the index format may have moved."
+          exit 1
