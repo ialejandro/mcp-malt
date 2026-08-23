@@ -1,0 +1,12 @@
+# Deny everything, then allow only what the Dockerfile actually copies.
+# An allowlist means a new file or directory cannot silently enlarge the build
+# context or bust the layer cache.
+*
+
+!package.json
+!package-lock.json
+!tsconfig.json
+!src
+
+# Nothing below src/ is needed at build time either.
+src/**/*.test.ts

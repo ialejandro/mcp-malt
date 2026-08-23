@@ -1,0 +1,105 @@
+name: Create release
+
+# Analyses the conventional commits since the last release, then publishes the
+# package to npm, creates the tag and publishes the GitHub release.
+#
+# @semantic-release/npm sets the version in package.json before packing, so the
+# published package carries the right version. That bump is not committed back,
+# so package.json on main stays at its starting value and a release changes
+# nothing in the repository. src/index.ts reads the version from the manifest at
+# runtime, which is why the published server reports the released version.
+#
+# The tag is what triggers docker-build.yml. That only works because the tag is
+# pushed with a PAT: a tag created with the default GITHUB_TOKEN does not start
+# another workflow, which is a deliberate GitHub loop guard.
+#
+# A push with no releasable commits produces no release. feat, fix, perf and
+# breaking changes cut one; chore, docs, test, refactor and style do not.
+
+permissions: {}
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Work out the next version and print it, without publishing'
+        type: boolean
+        default: false
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Create tag release
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      # Required for npm provenance.
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # semantic-release reads the full history to find the last release.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The published package ships dist/, so a broken build must stop the
+      # release rather than publish an empty or stale tarball.
+      - name: Verify before publishing
+        run: |
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Configure Git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - name: Semantic Release
+        id: semantic_release
+        uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
+        with:
+          branch: main
+          tag_format: v${version}
+          dry_run: ${{ inputs.dry_run || false }}
+        env:
+          # A PAT, not GITHUB_TOKEN, so the tag this creates triggers
+          # docker-build.yml. With GITHUB_TOKEN the tag lands and nothing runs.
+          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      - name: Summarise
+        run: |
+          {
+            if [ "${{ steps.semantic_release.outputs.new_release_published }}" = "true" ]; then
+              version="${{ steps.semantic_release.outputs.new_release_version }}"
+              echo "## Released v${version}"
+              echo
+              echo "- npm: \`npx -y mcp-malt@${version}\`"
+              echo "- image: building now from tag \`v${version}\`"
+            else
+              echo "## No release"
+              echo
+              echo "No releasable commits since the last tag. feat, fix and perf cut a release;"
+              echo "chore, docs, test, refactor and style do not."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

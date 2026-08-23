@@ -1,0 +1,50 @@
+{
+  "name": "mcp-malt",
+  "version": "0.1.0",
+  "description": "MCP server for the Malt API: invoices, payments, service charges and SCIM user provisioning.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ialejandro/mcp-malt.git"
+  },
+  "homepage": "https://github.com/ialejandro/mcp-malt#readme",
+  "bugs": {
+    "url": "https://github.com/ialejandro/mcp-malt/issues"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-malt": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check-spec": "node scripts/check-spec-drift.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "keywords": [
+    "mcp",
+    "modelcontextprotocol",
+    "malt",
+    "invoices",
+    "scim"
+  ],
+  "license": "MIT"
+}

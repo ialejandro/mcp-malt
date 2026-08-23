@@ -1,0 +1,5 @@
+# Prettier is scoped to TypeScript. YAML and Markdown here are hand-formatted
+# and a formatter would only churn them; pre-commit checks their syntax instead.
+*
+!src/**/*.ts
+!test/**/*.ts

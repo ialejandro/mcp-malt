@@ -1,0 +1,62 @@
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+    - id: check-added-large-files
+    - id: end-of-file-fixer
+    - id: trailing-whitespace
+    - id: check-merge-conflict
+    - id: check-symlinks
+    - id: check-json
+    - id: check-yaml
+    - id: mixed-line-ending
+      args:
+        - --fix=lf
+    - id: no-commit-to-branch
+      args:
+        - --branch
+        - main
+
+# A Malt API token in a commit is the worst outcome this repo has. It is shown
+# once at creation, so a leak means revoke and reissue.
+- repo: https://github.com/gitleaks/gitleaks
+  rev: v8.30.0
+  hooks:
+    - id: gitleaks
+
+- repo: https://github.com/jorisroovers/gitlint
+  rev: v0.19.1
+  hooks:
+    - id: gitlint
+
+- repo: https://github.com/rbubley/mirrors-prettier
+  rev: v3.9.6
+  hooks:
+    - id: prettier
+      files: \.tsx?$
+
+- repo: local
+  hooks:
+    # stdout carries the JSON-RPC protocol on a stdio server. Anything else
+    # written there corrupts the stream for every client, and the symptom is a
+    # client that silently fails to connect.
+    - id: no-stdout-writes
+      name: no console.log in src
+      entry: scripts/check-no-stdout.sh
+      language: script
+      files: ^src/.*\.ts$
+      pass_filenames: false
+
+    - id: typecheck
+      name: tsc --noEmit
+      entry: npm run typecheck
+      language: system
+      files: \.ts$
+      pass_filenames: false
+
+    - id: test
+      name: vitest run
+      entry: npm test
+      language: system
+      files: ^(src|test)/.*\.ts$
+      pass_filenames: false
