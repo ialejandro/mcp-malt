@@ -35,7 +35,7 @@ Published three ways from one release: the npm package on [npmjs](https://www.np
 Pin a version in the examples below. An MCP server runs with your API token, so an unpinned `@latest` means a new release starts running on your machine without you choosing it.
 
 ```bash
-npm install @ialejandro/mcp-malt@1.0.0
+npm install @ialejandro/mcp-malt@1.1.0
 ```
 
 To move to a newer version, bump the number in your client config and restart the client. The [releases page](https://github.com/ialejandro/mcp-malt/releases) lists what changed in each one.
@@ -51,7 +51,7 @@ To install from GitHub Packages instead of npmjs, point the scope at it: `@ialej
   "mcpServers": {
     "malt": {
       "command": "npx",
-      "args": ["-y", "@ialejandro/mcp-malt@1.0.0"],
+      "args": ["-y", "@ialejandro/mcp-malt@1.1.0"],
       "env": {
         "MALT_API_TOKEN": "your-token-here",
         "MALT_TOOLSETS": "invoices,payments,fee-invoices"
@@ -67,7 +67,7 @@ To install from GitHub Packages instead of npmjs, point the scope at it: `@ialej
 claude mcp add malt \
   --env MALT_API_TOKEN=your-token-here \
   --env MALT_TOOLSETS=invoices,payments,fee-invoices \
-  -- npx -y @ialejandro/mcp-malt@1.0.0
+  -- npx -y @ialejandro/mcp-malt@1.1.0
 ```
 
 ### Docker

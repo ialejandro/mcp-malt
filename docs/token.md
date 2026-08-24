@@ -24,7 +24,7 @@ The mismatch to watch for: a freelancer token against a SCIM endpoint returns 40
 ```bash
 export MALT_API_TOKEN='your-token-here'
 export MALT_TOOLSETS='invoices'
-npx -y @ialejandro/mcp-malt@1.0.0
+npx -y @ialejandro/mcp-malt@1.1.0
 ```
 
 Check it works before wiring it into a client:
