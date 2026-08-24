@@ -1,5 +1,8 @@
 # mcp-malt
 
+> [!NOTE]
+> This project is not affiliated with [Malt](https://malt.com).
+
 An MCP server for the [Malt API](https://api.malt.com). It covers all 13 operations Malt publishes: the invoices you issue, the commission Malt bills you, the payments you receive, and SCIM user provisioning for organization accounts.
 
 ## What this does and does not cover
