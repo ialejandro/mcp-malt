@@ -126,26 +126,6 @@ npm ci && npm run build
 }
 ```
 
-```jsonc
-{
-  "mcpServers": {
-    "malt": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "MALT_API_TOKEN",
-        "-e", "MALT_TOOLSETS",
-        "ghcr.io/ialejandro/mcp-malt:1.0.0"
-      ],
-      "env": {
-        "MALT_API_TOKEN": "your-token-here",
-        "MALT_TOOLSETS": "invoices,payments,fee-invoices"
-      }
-    }
-  }
-}
-```
-
 ## Configuration
 
 | Variable | Default | What it does |
@@ -166,6 +146,8 @@ An unknown toolset name stops the server with an error rather than being ignored
 
 ## Common tasks
 
+You never name a tool yourself. You say what you want, the model picks from the tools the server registered at startup, and the server turns each call into an HTTP request to Malt with your token attached. [docs/examples.md](docs/examples.md) walks through each of these end to end, showing the tool calls and the responses.
+
 **Reconcile a quarter.** Enable `invoices,payments,fee-invoices` and run the `malt_reconcile_revenue` prompt. It pulls all three lists, matches payments to the invoices they settle, and reports gross billed, tax, Malt's commission, and cash received.
 
 > Reconcile my Malt revenue for Q1 2026.
@@ -180,6 +162,7 @@ An unknown toolset name stops the server with an error rather than being ignored
 
 ## Documentation
 
+- [Examples, end to end](docs/examples.md)
 - [Getting and managing a token](docs/token.md)
 - [Authentication, and why there is no OAuth](docs/authentication.md)
 - [Toolsets: what to enable and when](docs/toolsets.md)
